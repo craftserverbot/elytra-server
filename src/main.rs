@@ -1,14 +1,12 @@
 mod server_info;
 mod worker;
 
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 
 use clap::Parser;
+use elytra_ping::SlpProtocol;
 use server_info::resolve_server_info;
-use tokio::{net::TcpListener, signal::ctrl_c};
+use tokio::net::TcpListener;
 use tracing::error;
 use tracing_subscriber::EnvFilter;
 
@@ -50,40 +48,24 @@ async fn app() -> Result<(), Box<dyn std::error::Error>> {
 
     let server =
         TcpListener::bind((if args.expose { "0.0.0.0" } else { "127.0.0.1" }, args.port)).await?;
-    let should_shutdown = Arc::new(AtomicBool::new(false));
-
-    {
-        let should_shutdown = should_shutdown.clone();
-        tokio::spawn(async move {
-            ctrl_c().await.expect("Failed to listen for Ctrl+C");
-            should_shutdown.store(true, Ordering::Relaxed);
-        });
-    }
 
     tracing::info!("Listening on {}", server.local_addr()?);
 
     loop {
-        if should_shutdown.load(Ordering::Relaxed) {
-            break;
-        }
-
         let (socket, _) = server.accept().await?;
         let server_info = server_info.clone();
         let server_addr = server.local_addr()?;
 
         tokio::spawn(async move {
-            let result = worker::run_worker(
-                socket,
-                server_info,
-                (server_addr.ip().to_string(), server_addr.port()),
-            )
-            .await;
+            let mut protocol =
+                SlpProtocol::new(server_addr.ip().to_string(), server_addr.port(), socket);
 
+            let result = worker::run_worker(&mut protocol, &server_info).await;
             if let Err(error) = result {
                 error!("Failed to respond to ping: {}", error);
             }
+
+            _ = protocol.disconnect().await;
         });
     }
-
-    Ok(())
 }

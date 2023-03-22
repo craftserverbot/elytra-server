@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.1.11", features = ["derive"] }
 const_format = "0.2.30"
-elytra-ping = { git = "https://github.com/craftserverbot/elytra-ping", version = "1.2.0" }
+elytra-ping = { git = "https://github.com/craftserverbot/elytra-ping", version = "1.2.0", rev = "84c565b" }
 snafu = "0.7.4"
 tokio = { version = "1.26.0", features = [
     "rt",

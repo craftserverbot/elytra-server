@@ -1,10 +1,8 @@
 use elytra_ping::{
-    protocol::{Frame, ProtocolError},
+    protocol::{Frame, ProtocolError, ProtocolState, ServerState},
     SlpProtocol,
 };
 use snafu::{Backtrace, Snafu};
-use std::sync::Arc;
-use tokio::net::TcpStream;
 use tracing::debug;
 
 #[derive(Snafu, Debug)]
@@ -18,9 +16,9 @@ pub enum WorkerError {
     },
 }
 
-async fn read_frame(protocol: &mut SlpProtocol) -> Result<Frame, WorkerError> {
+async fn read_frame(protocol: &mut SlpProtocol, state: ServerState) -> Result<Frame, WorkerError> {
     let frame = protocol
-        .read_frame()
+        .read_frame(Some(state))
         .await?
         .ok_or_else(|| ConnectionDroppedSnafu.build())?;
 
@@ -28,17 +26,47 @@ async fn read_frame(protocol: &mut SlpProtocol) -> Result<Frame, WorkerError> {
 }
 
 /// Handle a single client connection
-pub async fn run_worker(
-    socket: TcpStream,
-    server_info: Arc<String>,
-    server_addr: (String, u16),
-) -> Result<(), WorkerError> {
-    let mut protocol = SlpProtocol::new(server_addr.0, server_addr.1, socket);
+pub async fn run_worker(protocol: &mut SlpProtocol, server_info: &str) -> Result<(), WorkerError> {
+    let mut state = ServerState::Handshake;
 
     debug!("New connection, ready for handshake");
 
-    // read handshake from the client
-    let frame = read_frame(&mut protocol).await?;
+    loop {
+        let frame = read_frame(protocol, state).await?;
+        debug!("Recived frame: {:?}", frame);
+
+        match frame {
+            Frame::Handshake {
+                state: new_state, ..
+            } => {
+                let new_state: i32 = new_state.into();
+                if new_state != ProtocolState::Status as i32 {
+                    debug!("Client attempted to log in to the server - closing connection");
+                    break;
+                }
+
+                state = ServerState::Status;
+
+                debug!("Recived handshake, ready for status request");
+            }
+            Frame::StatusRequest => {
+                debug!("Recived status request, sending server info");
+                let response = Frame::StatusResponse {
+                    json: server_info.to_string(),
+                };
+                protocol.write_frame(response).await?;
+            }
+            Frame::PingRequest { payload } => {
+                debug!("Recived ping, sending pong");
+                let response = Frame::PingResponse { payload };
+                protocol.write_frame(response).await?;
+            }
+            _ => {
+                debug!("Recived unexpected frame, closing connection");
+                break;
+            }
+        }
+    }
 
     Ok(())
 }

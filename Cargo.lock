@@ -151,7 +151,7 @@ checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 [[package]]
 name = "elytra-ping"
 version = "1.2.0"
-source = "git+https://github.com/craftserverbot/elytra-ping#7cadb90ac89aeb5106976c278843d39dffc28dbf"
+source = "git+https://github.com/craftserverbot/elytra-ping?rev=84c565b#84c565b86d176593f56a7fb93239b3b814567e4b"
 dependencies = [
  "bytes",
  "mc-varint",
