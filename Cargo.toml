@@ -1,0 +1,22 @@
+[package]
+name = "elytra-server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version = "4.1.11", features = ["derive"] }
+const_format = "0.2.30"
+elytra-ping = { git = "https://github.com/craftserverbot/elytra-ping", version = "1.2.0" }
+snafu = "0.7.4"
+tokio = { version = "1.26.0", features = [
+    "rt",
+    "rt-multi-thread",
+    "macros",
+    "net",
+    "fs",
+    "signal",
+] }
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
